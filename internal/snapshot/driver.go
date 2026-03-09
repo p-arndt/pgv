@@ -30,7 +30,9 @@ type ObjectStats struct {
 	SizeBytes int64
 }
 
-type ValidateDriverRequest struct{}
+type ValidateDriverRequest struct {
+	TargetPath string
+}
 
 type Driver interface {
 	Name() string

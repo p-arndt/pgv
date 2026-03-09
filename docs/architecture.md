@@ -39,10 +39,14 @@ When you branch from a snapshot, PGV simply copies the physical files from `.pgv
 
 ### Checkpointing (`pgv checkpoint`)
 When you create a checkpoint, PGV copies the physical files from the active branch into a new immutable snapshot directory. 
+
+* **Smart Clone (cowfs):** On modern filesystems (Btrfs, XFS on Linux, or ReFS, Dev Drive, recent NTFS on Windows), PGV uses block-level copy-on-write (`unix.FICLONE` or `FSCTL_DUPLICATE_EXTENTS_TO_FILE`). This makes checkpoints instant and zero-byte in overhead.
+* **Fallback (copydir):** If CoW is unavailable, PGV performs a full deep-copy of the directory.
+
 *Safety feature:* If the branch's Docker container is currently running, PGV temporarily stops it to ensure the files on disk are completely flushed and consistent before copying them.
 
 ### Restoring (`pgv restore`)
-Restoring deletes the corrupted/unwanted files in your branch's directory and recursively clones the pristine files from the snapshot back into your branch folder.
+Restoring deletes the corrupted/unwanted files in your branch's directory and recursively clones the pristine files from the snapshot back into your branch folder (using CoW block cloning if supported).
 
 ### Running (`pgv start`)
 PGV uses the Docker SDK to spin up a container. It dynamically maps the specific branch's `PGDATA` folder into the container and binds it to a unique host port (e.g., `5540`, `5541`). This ensures complete isolation.

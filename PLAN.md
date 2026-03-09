@@ -1199,7 +1199,7 @@ Get an end-to-end working prototype.
 
 ### Scope
 
-* `cowfs` driver
+* `cowfs` driver implemented for fast clones on Linux/Windows
 * schema diff
 * tags
 * safe-migrate wrapper

@@ -11,6 +11,7 @@ import (
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
+	"pgv/internal/snapshot/cowfs"
 )
 
 type BranchService struct {
@@ -20,9 +21,12 @@ type BranchService struct {
 
 func NewBranchService(db *metadata.DB, driver string) (*BranchService, error) {
 	var d snapshot.Driver
-	if driver == "copydir" {
+	switch driver {
+	case "cowfs":
+		d = cowfs.NewDriver()
+	case "copydir":
 		d = copydir.NewDriver()
-	} else {
+	default:
 		d = copydir.NewDriver()
 	}
 	return &BranchService{db: db, driver: d}, nil

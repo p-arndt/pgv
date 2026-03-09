@@ -12,6 +12,7 @@ import (
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
+	"pgv/internal/snapshot/cowfs"
 )
 
 type SnapshotService struct {
@@ -20,9 +21,10 @@ type SnapshotService struct {
 }
 
 func NewSnapshotService(db *metadata.DB, driver string) (*SnapshotService, error) {
-	// For MVP only copydir is supported here, but can map to others
 	var d snapshot.Driver
-	if driver == "copydir" {
+	if driver == "cowfs" {
+		d = cowfs.NewDriver()
+	} else if driver == "copydir" {
 		d = copydir.NewDriver()
 	} else {
 		d = copydir.NewDriver() // fallback

@@ -11,6 +11,7 @@ import (
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
+	"pgv/internal/snapshot/cowfs"
 	"pgv/internal/util"
 )
 
@@ -48,8 +49,20 @@ func (s *RepoService) Init(repoName, fromDir string) error {
 		}
 	}
 
+	// Smart Router: test CoW support
+	var selectedDriver string
+	cowDriver := cowfs.NewDriver()
+	if err := cowDriver.Validate(context.Background(), snapshot.ValidateDriverRequest{TargetPath: s.rootDir}); err == nil {
+		selectedDriver = "cowfs"
+		fmt.Println("Copy-on-Write (CoW) filesystem detected. Zero-bloat snapshots enabled.")
+	} else {
+		selectedDriver = "copydir"
+		fmt.Printf("CoW not available (%v). Falling back to full copy (copydir) snapshots.\n", err)
+	}
+
 	// 2. Create Default Config
 	cfg := config.DefaultConfig(repoName)
+	cfg.SnapshotDriver = selectedDriver // Update with the selected driver
 	cfgPath := filepath.Join(pgvDir, "config.json")
 	if err := config.SaveConfig(cfgPath, &cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
@@ -89,8 +102,13 @@ func (s *RepoService) Init(repoName, fromDir string) error {
 	// If fromDir is provided, we copy the physical state
 	if fromDir != "" {
 		fmt.Printf("Importing physical data from %s...\n", fromDir)
-		// Assuming we use copydir for MVP
-		importDriver := copydir.NewDriver()
+		var importDriver snapshot.Driver
+		if selectedDriver == "cowfs" {
+			importDriver = cowfs.NewDriver()
+		} else {
+			importDriver = copydir.NewDriver()
+		}
+
 		req := snapshot.CloneSnapshotRequest{
 			SourcePath: fromDir,
 			TargetPath: mainDataPath,
