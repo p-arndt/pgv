@@ -16,10 +16,10 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
-            binary_name: dorcs-linux-amd64
+            binary_name: pgv-linux-amd64
           - goos: windows
             goarch: amd64
-            binary_name: dorcs-windows-amd64.exe
+            binary_name: pgv-windows-amd64.exe
 
     steps:
       - uses: actions/checkout@v5
@@ -62,9 +62,9 @@ jobs:
           
           go build \
             -trimpath \
-            -ldflags "-s -w -X main.Version=${VERSION} ${LDFLAGS}" \
+            -ldflags "-s -w -X pgv/internal/app.Version=${VERSION} ${LDFLAGS}" \
             -o binaries/${{ matrix.binary_name }} \
-            ./cmd/dorcs
+            ./cmd/pgv
 
       - uses: actions/upload-artifact@v4
         with:
@@ -104,7 +104,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: binaries
-          pattern: "dorcs-*"
+          pattern: "pgv-*"
           merge-multiple: true
 
       - name: Create GitHub Release
