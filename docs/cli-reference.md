@@ -29,8 +29,10 @@ Stops the Postgres Docker container for the specified branch.
 ### `pgv checkout <branch-name>`
 Switches your active working branch (HEAD).
 
-### `pgv branch <source-snapshot-id> <new-branch-name>`
-Creates a new writable branch isolated from the rest of your database, based on a specific immutable snapshot.
+### `pgv branch <new-branch-name> [source]`
+Creates a new writable branch isolated from the rest of your database. 
+- If `[source]` is omitted, it branches directly from the active branch.
+- `[source]` can be a branch name or an immutable snapshot ID. If a branch is specified as the source, PGV automatically creates a checkpoint first to branch from.
 
 ### `pgv delete branch <branch-name> [--force]`
 Permanently deletes a branch and its physical data. 
