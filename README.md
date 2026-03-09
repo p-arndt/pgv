@@ -14,6 +14,13 @@ PGV is a local developer tool that provides **fast rollback, branching, and rest
 * You want to instantly return to an older database state **including all rows**, without waiting 15 minutes for `pg_dump` and `pg_restore`.
 * You want to test a feature on an isolated branch with a copy of your main database.
 
+## Quick Links
+
+- [Getting Started](docs/getting-started.md)
+- [CLI Reference](docs/cli-reference.md)
+- [Architecture](docs/architecture.md)
+- [Workflows](docs/workflows.md)
+
 ## Installation
 
 Ensure you have Docker installed and running.
