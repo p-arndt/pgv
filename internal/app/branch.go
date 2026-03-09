@@ -17,10 +17,11 @@ var branchCmd = &cobra.Command{
 		source := args[0]
 		branchName := args[1]
 
-		_, db, repo, err := getRepoContext()
+		_, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		branchSvc, err := services.NewBranchService(db, repo.SnapshotDriver)

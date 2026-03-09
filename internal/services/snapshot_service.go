@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pgv/internal/config"
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
@@ -29,7 +30,7 @@ func NewSnapshotService(db *metadata.DB, driver string) (*SnapshotService, error
 	return &SnapshotService{db: db, driver: d}, nil
 }
 
-func (s *SnapshotService) CreateCheckpoint(ctx context.Context, repoID, branchID, label string) (string, error) {
+func (s *SnapshotService) CreateCheckpoint(ctx context.Context, cfg *config.Config, repoID, branchID, label string) (string, error) {
 	var branch metadata.Branch
 	if err := s.db.Get(&branch, "SELECT * FROM branches WHERE id = ?", branchID); err != nil {
 		return "", fmt.Errorf("branch not found: %w", err)
@@ -40,9 +41,18 @@ func (s *SnapshotService) CreateCheckpoint(ctx context.Context, repoID, branchID
 		return "", fmt.Errorf("repo not found: %w", err)
 	}
 
-	// Wait, Postgres checkpoint/restore point logic goes here ideally via Postgres Control Layer
-	// MVP: Stop branch, create snapshot, restart branch (or just clone data directly if copydir supports it, copydir on live PGDATA is risky but let's try for MVP or require stop)
-	// Actually, if branch is stopped, copy is safe. If running, pg_basebackup is better, but MVP plan said: "Basebackup or copydir, whichever is simpler" and "never edit files inside a running PGDATA unless operation is known-safe".
+	wasRunning := branch.Status == "running"
+	runtimeSvc, err := NewRuntimeService(s.db)
+	if err != nil {
+		return "", fmt.Errorf("could not initialize runtime service: %w", err)
+	}
+
+	if wasRunning {
+		fmt.Printf("Stopping branch '%s' to create safe physical snapshot...\n", branch.Name)
+		if err := runtimeSvc.StopBranch(ctx, branch.ID); err != nil {
+			return "", fmt.Errorf("failed to stop branch for snapshot: %w", err)
+		}
+	}
 
 	snapshotID := "snap_" + strings.ReplaceAll(uuid.New().String(), "-", "")[0:12]
 	snapshotsDir := filepath.Join(repo.RootPath, ".pgv", "storage", "snapshots", snapshotID)
@@ -54,7 +64,18 @@ func (s *SnapshotService) CreateCheckpoint(ctx context.Context, repoID, branchID
 
 	res, err := s.driver.CreateSnapshot(ctx, req)
 	if err != nil {
+		// Try to restart branch if it was running before we return error
+		if wasRunning {
+			_ = runtimeSvc.StartBranch(ctx, branch.ID, cfg)
+		}
 		return "", fmt.Errorf("driver failed to create snapshot: %w", err)
+	}
+
+	if wasRunning {
+		fmt.Printf("Restarting branch '%s'...\n", branch.Name)
+		if err := runtimeSvc.StartBranch(ctx, branch.ID, cfg); err != nil {
+			fmt.Printf("Warning: failed to restart branch after snapshot: %v\n", err)
+		}
 	}
 
 	var parentID *string

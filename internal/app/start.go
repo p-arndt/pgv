@@ -16,10 +16,11 @@ var startCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		branchName := args[0]
 
-		cfg, db, repo, err := getRepoContext()
+		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		var branch metadata.Branch

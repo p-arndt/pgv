@@ -16,10 +16,11 @@ var importCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceURL := args[0]
 
-		cfg, db, repo, err := getRepoContext()
+		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		if repo.ActiveBranchID == "" {

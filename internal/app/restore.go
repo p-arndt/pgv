@@ -18,10 +18,11 @@ var restoreCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapshotID := args[0]
 
-		_, db, repo, err := getRepoContext()
+		_, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		targetBranch := restoreBranch

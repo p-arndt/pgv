@@ -14,10 +14,11 @@ var checkpointCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		label := args[0]
-		_, db, repo, err := getRepoContext()
+		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		if repo.ActiveBranchID == "" {
@@ -30,7 +31,7 @@ var checkpointCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Creating checkpoint '%s'...\n", label)
-		snapID, err := snapSvc.CreateCheckpoint(context.Background(), repo.ID, repo.ActiveBranchID, label)
+		snapID, err := snapSvc.CreateCheckpoint(context.Background(), cfg, repo.ID, repo.ActiveBranchID, label)
 		if err != nil {
 			return err
 		}

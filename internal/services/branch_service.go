@@ -167,3 +167,47 @@ func (s *BranchService) Checkout(ctx context.Context, repoID, branchName string)
 
 	return tx.Commit()
 }
+
+func (s *BranchService) DeleteBranch(ctx context.Context, repoID, branchName string, force bool) error {
+	var branch metadata.Branch
+	if err := s.db.Get(&branch, "SELECT * FROM branches WHERE repo_id = ? AND name = ?", repoID, branchName); err != nil {
+		return fmt.Errorf("branch %s not found: %w", branchName, err)
+	}
+
+	if branch.IsHead && !force {
+		return fmt.Errorf("cannot delete active branch without --force flag")
+	}
+
+	if branch.Status == "running" && !force {
+		return fmt.Errorf("cannot delete running branch, stop it first or use --force flag")
+	}
+
+	if branch.Status == "running" {
+		runtimeSvc, err := NewRuntimeService(s.db)
+		if err == nil {
+			_ = runtimeSvc.StopBranch(ctx, branch.ID)
+		}
+	}
+
+	// Delete existing branch data
+	if err := s.driver.DeleteBranchData(ctx, snapshot.DeleteBranchDataRequest{TargetPath: branch.DataPath}); err != nil {
+		return fmt.Errorf("failed to clean existing branch data: %w", err)
+	}
+
+	tx := s.db.MustBegin()
+	// Clean up instances record
+	_, _ = tx.Exec(`DELETE FROM instances WHERE branch_id = ?`, branch.ID)
+
+	_, err := tx.Exec(`DELETE FROM branches WHERE id = ?`, branch.ID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete branch metadata: %w", err)
+	}
+
+	if branch.IsHead {
+		// If we force deleted HEAD, set active branch to null
+		_, _ = tx.Exec(`UPDATE repos SET active_branch_id = NULL WHERE id = ?`, repoID)
+	}
+
+	return tx.Commit()
+}

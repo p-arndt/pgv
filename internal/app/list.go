@@ -14,10 +14,11 @@ var listCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List branches and snapshots",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		_, db, repo, err := getRepoContext()
+		_, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
+		defer lock.Unlock()
 		defer db.Close()
 
 		var branches []metadata.Branch
