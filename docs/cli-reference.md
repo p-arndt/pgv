@@ -15,6 +15,9 @@ Lists all branches, their current status (stopped/running), ports, and all avail
 ### `pgv url [branch-name]`
 Outputs the `postgres://` connection string for the specified branch. If no branch is specified, it outputs the URL for the active branch.
 
+### `pgv status`
+Displays the active branch, its status (running/stopped), current port, and the most recent snapshot applied.
+
 ## Branch Management
 
 ### `pgv start <branch-name>`
@@ -37,12 +40,23 @@ Permanently deletes a branch and its physical data.
 
 ### `pgv checkpoint <message>`
 Takes an immutable physical snapshot of the active branch. 
-*Note: If the branch is running, PGV will automatically stop it, take the physical snapshot, and restart it to prevent data corruption.*
+
+> [!NOTE]
+> If the branch is running, PGV will automatically stop it, take the physical snapshot, and restart it to prevent data corruption.
+
 
 ### `pgv restore <snapshot-id> [--branch <branch-name>]`
 Replaces the physical state of the specified branch with the contents of a snapshot.
 - `--branch`: Optional. If not provided, restores the currently active branch.
-*Note: You must run `pgv stop <branch>` before attempting to restore its state.*
+
+> [!NOTE]
+> If the branch is running, PGV will automatically stop it, restore the data, and restart it.
+
+### `pgv rollback`
+A quick helper command that automatically restores the active branch to its most recent snapshot (`HEAD`). This is the fastest way to undo a local mistake if you just took a checkpoint.
+
+> [!NOTE]
+> If the branch is running, PGV will automatically stop it, roll back the data, and restart it.
 
 ### `pgv import <postgres-url>`
 Performs a logical `pg_dump` from the provided URL directly into the active, running PGV branch. Uses internal Docker piping so no host binaries are required.

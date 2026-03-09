@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"pgv/internal/config"
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
@@ -94,7 +95,7 @@ func (s *BranchService) CreateBranch(ctx context.Context, repoID, sourceSnapshot
 	return branch.ID, nil
 }
 
-func (s *BranchService) RestoreBranch(ctx context.Context, branchID, snapshotID string) error {
+func (s *BranchService) RestoreBranch(ctx context.Context, cfg *config.Config, branchID, snapshotID string) error {
 	var branch metadata.Branch
 	if err := s.db.Get(&branch, "SELECT * FROM branches WHERE id = ?", branchID); err != nil {
 		return fmt.Errorf("branch not found: %w", err)
@@ -105,8 +106,17 @@ func (s *BranchService) RestoreBranch(ctx context.Context, branchID, snapshotID 
 		return fmt.Errorf("snapshot not found: %w", err)
 	}
 
-	if branch.Status == "running" {
-		return fmt.Errorf("cannot restore a running branch, stop it first")
+	wasRunning := branch.Status == "running"
+	runtimeSvc, err := NewRuntimeService(s.db)
+	if err != nil {
+		return fmt.Errorf("could not initialize runtime service: %w", err)
+	}
+
+	if wasRunning {
+		fmt.Printf("Stopping branch '%s' to perform safe restore...\n", branch.Name)
+		if err := runtimeSvc.StopBranch(ctx, branch.ID); err != nil {
+			return fmt.Errorf("failed to stop branch for restore: %w", err)
+		}
 	}
 
 	// Delete existing branch data
@@ -120,14 +130,26 @@ func (s *BranchService) RestoreBranch(ctx context.Context, branchID, snapshotID 
 		TargetPath: branch.DataPath,
 	}
 	if _, err := s.driver.CloneSnapshotToBranch(ctx, req); err != nil {
+		// Attempt to start if it was running, although data might be broken now
+		if wasRunning {
+			fmt.Printf("Warning: failed to restore branch. Restarting in potentially broken state...\n")
+			_ = runtimeSvc.StartBranch(ctx, branch.ID, cfg)
+		}
 		return fmt.Errorf("driver failed to restore branch: %w", err)
+	}
+
+	if wasRunning {
+		fmt.Printf("Restarting branch '%s'...\n", branch.Name)
+		if err := runtimeSvc.StartBranch(ctx, branch.ID, cfg); err != nil {
+			fmt.Printf("Warning: failed to restart branch after restore: %v\n", err)
+		}
 	}
 
 	// Update branch metadata
 	now := time.Now().UTC()
 	tx := s.db.MustBegin()
 
-	_, err := tx.Exec(`UPDATE branches SET head_snapshot_id = ?, updated_at = ? WHERE id = ?`, snap.ID, now, branch.ID)
+	_, err = tx.Exec(`UPDATE branches SET head_snapshot_id = ?, updated_at = ? WHERE id = ?`, snap.ID, now, branch.ID)
 	if err != nil {
 		tx.Rollback()
 		return err

@@ -84,9 +84,7 @@ pgv start feature-branch
 
 **Oops, I broke my database! Let's restore it:**
 ```bash
-pgv stop main
-pgv restore "before dropping users table"
-pgv start main
+pgv rollback   # Instantly undoes your changes since the last checkpoint!
 ```
 
 **List all your branches and snapshots:**

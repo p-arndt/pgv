@@ -73,17 +73,13 @@ pgv checkpoint "before dropping users table"
 ```
 
 ### Rolling Back
-If you broke something, you can restore your database in seconds:
+If you broke something, you can restore your database to the last checkpoint in seconds:
 ```bash
-# Stop the database first
-pgv stop main
-
-# Restore the state
-pgv restore "before dropping users table"
-
-# Start it back up
-pgv start main
+# Rollback to the previous state
+pgv rollback
 ```
+
+If you need to go back further in time, you can find a specific snapshot ID via `pgv list` and use `pgv restore <snapshot-id>`.
 
 ### Branching
 Want to test a feature without touching your main database?
@@ -97,6 +93,8 @@ pgv checkout feature-x
 # Start the feature branch
 pgv start feature-x
 ```
-*Note: Your feature branch will be assigned a new port automatically, allowing you to run `main` and `feature-x` simultaneously!*
+
+> [!NOTE]
+> Your feature branch will be assigned a new port automatically, allowing you to run `main` and `feature-x` simultaneously!
 
 For more detailed command usage, see the [CLI Reference](cli-reference.md).

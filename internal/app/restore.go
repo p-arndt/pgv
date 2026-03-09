@@ -18,7 +18,7 @@ var restoreCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapshotID := args[0]
 
-		_, db, repo, lock, err := getRepoContext()
+		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ var restoreCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Restoring branch '%s' to snapshot '%s'...\n", targetBranch, snapshotID)
-		if err := branchSvc.RestoreBranch(context.Background(), branch.ID, snapshotID); err != nil {
+		if err := branchSvc.RestoreBranch(context.Background(), cfg, branch.ID, snapshotID); err != nil {
 			return err
 		}
 
