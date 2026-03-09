@@ -1,5 +1,10 @@
 # PGV — Local Postgres Version Control
 
+<div align="center">
+  <img src="./logo.png" alt="PGV Logo" width="200"/>
+  <p><em>Instant rollback, branching, and restore for PostgreSQL with data included.</em></p>
+</div>
+
 PGV is a local developer tool that provides **fast rollback, branching, and restore for PostgreSQL with data included**, without relying on slow logical dump/restore workflows. It operates like Git, but versions your physical database state.
 
 ## Why PGV?
