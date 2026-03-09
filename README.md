@@ -96,10 +96,4 @@ pgv list
 
 ---
 
-## Architecture
-
-* **Snapshots:** Immutable physical checkpoints of your PGDATA directory.
-* **Branches:** Writable clones derived from snapshots.
-* **Instances:** PGV spins up a dedicated Docker container for every active branch, mapping a unique host port to each.
-
 Enjoy safe, instant database rollbacks locally!
