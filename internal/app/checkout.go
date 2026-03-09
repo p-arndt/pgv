@@ -12,6 +12,12 @@ var checkoutCmd = &cobra.Command{
 	Use:   "checkout <branch-name>",
 	Short: "Switch the active branch",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return getBranchesForCompletion()
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		branchName := args[0]
 

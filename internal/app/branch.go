@@ -13,6 +13,13 @@ var branchCmd = &cobra.Command{
 	Use:   "branch <source-snapshot> <branch-name>",
 	Short: "Create a writable branch from a snapshot",
 	Args:  cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// Complete source-snapshot
+			return getSnapshotsForCompletion()
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		branchName := args[1]

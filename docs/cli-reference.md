@@ -60,3 +60,50 @@ A quick helper command that automatically restores the active branch to its most
 
 ### `pgv import <postgres-url>`
 Performs a logical `pg_dump` from the provided URL directly into the active, running PGV branch. Uses internal Docker piping so no host binaries are required.
+
+## Shell Autocompletion
+
+PGV provides a `completion` command to generate autocompletion scripts for various shells (Bash, Zsh, Fish, PowerShell). This enables you to press `TAB` to auto-complete commands, flags, branch names, and snapshot IDs.
+
+### Windows (PowerShell)
+
+To enable autocompletion in PowerShell, you need to add the completion script to your PowerShell profile.
+
+1. Open PowerShell.
+2. Check if you have a profile script set up:
+   ```powershell
+   Test-Path $PROFILE
+   ```
+3. If it returns `False`, create one:
+   ```powershell
+   New-Item -Type File -Path $PROFILE -Force
+   ```
+4. Open your profile in Notepad or your preferred editor:
+   ```powershell
+   notepad $PROFILE
+   ```
+5. Add the following line to the file, save, and close it:
+   ```powershell
+   Invoke-Expression (& pgv completion powershell)
+   ```
+6. Restart your PowerShell session. Now, typing `pgv checkout <TAB>` will suggest your branch names!
+
+### Linux / macOS (Zsh)
+
+If you use Oh My Zsh or standard Zsh, you can add this to your `~/.zshrc`:
+
+```zsh
+source <(pgv completion zsh)
+```
+
+Restart your terminal or run `source ~/.zshrc` to apply the changes.
+
+### Linux / macOS (Bash)
+
+If you use Bash, you can add this to your `~/.bashrc`:
+
+```bash
+source <(pgv completion bash)
+```
+
+Restart your terminal or run `source ~/.bashrc` to apply the changes.

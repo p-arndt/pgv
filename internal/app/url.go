@@ -11,6 +11,12 @@ var urlCmd = &cobra.Command{
 	Use:   "url [branch-name]",
 	Short: "Display the connection URL for a branch (defaults to active branch)",
 	Args:  cobra.MaximumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return getBranchesForCompletion()
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {
