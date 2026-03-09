@@ -9,6 +9,8 @@ import (
 	"pgv/internal/services"
 )
 
+var initFromDir string
+
 var initCmd = &cobra.Command{
 	Use:   "init [repo-name]",
 	Short: "Initialize a new PGV repository",
@@ -26,15 +28,19 @@ var initCmd = &cobra.Command{
 
 		fmt.Printf("Initializing repository '%s' in %s\n", repoName, cwd)
 		repoService := services.NewRepoService(cwd)
-		if err := repoService.Init(repoName); err != nil {
+		if err := repoService.Init(repoName, initFromDir); err != nil {
 			return err
 		}
 
 		fmt.Println("Initialization complete.")
+		if initFromDir != "" {
+			fmt.Println("Data successfully imported from", initFromDir)
+		}
 		return nil
 	},
 }
 
 func init() {
+	initCmd.Flags().StringVar(&initFromDir, "from-dir", "", "Import physical state from existing PGDATA directory")
 	rootCmd.AddCommand(initCmd)
 }

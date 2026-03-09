@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/google/uuid"
 	"pgv/internal/config"
 	"pgv/internal/metadata"
+	"pgv/internal/snapshot"
+	"pgv/internal/snapshot/copydir"
 	"pgv/internal/util"
 )
 
@@ -23,7 +26,7 @@ func (s *RepoService) PgvDir() string {
 	return filepath.Join(s.rootDir, ".pgv")
 }
 
-func (s *RepoService) Init(repoName string) error {
+func (s *RepoService) Init(repoName, fromDir string) error {
 	pgvDir := s.PgvDir()
 	if util.Exists(pgvDir) {
 		return fmt.Errorf("repository already initialized at %s", pgvDir)
@@ -81,14 +84,30 @@ func (s *RepoService) Init(repoName string) error {
 		return fmt.Errorf("failed to create repo record: %w", err)
 	}
 
-	// Create 'main' branch record (but no snapshot yet, it's empty)
+	mainDataPath := filepath.Join(pgvDir, "storage", "branches", cfg.DefaultBranch, "PGDATA")
+
+	// If fromDir is provided, we copy the physical state
+	if fromDir != "" {
+		fmt.Printf("Importing physical data from %s...\n", fromDir)
+		// Assuming we use copydir for MVP
+		importDriver := copydir.NewDriver()
+		req := snapshot.CloneSnapshotRequest{
+			SourcePath: fromDir,
+			TargetPath: mainDataPath,
+		}
+		if _, err := importDriver.CloneSnapshotToBranch(context.Background(), req); err != nil {
+			return fmt.Errorf("failed to import data from %s: %w", fromDir, err)
+		}
+	}
+
+	// Create 'main' branch record
 	mainBranch := metadata.Branch{
 		ID:             uuid.New().String(),
 		RepoID:         repoID,
 		Name:           cfg.DefaultBranch,
 		BaseSnapshotID: "", // No base yet
 		HeadSnapshotID: "", // No head yet
-		DataPath:       filepath.Join(pgvDir, "storage", "branches", cfg.DefaultBranch, "PGDATA"),
+		DataPath:       mainDataPath,
 		Status:         "stopped",
 		Port:           cfg.BasePort,
 		IsHead:         true,
