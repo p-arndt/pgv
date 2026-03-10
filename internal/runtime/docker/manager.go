@@ -55,6 +55,7 @@ func (m *Manager) Start(ctx context.Context, req StartRequest) (string, error) {
 	// 2. Create container
 	portString := fmt.Sprintf("%d/tcp", 5432)
 	hostConfig := &container.HostConfig{
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 		PortBindings: nat.PortMap{
 			nat.Port(portString): []nat.PortBinding{
 				{

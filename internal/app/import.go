@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 
@@ -15,6 +16,17 @@ var importCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceURL := args[0]
+		parsedURL, err := url.Parse(sourceURL)
+		if err == nil {
+			if parsedURL.Hostname() == "localhost" || parsedURL.Hostname() == "127.0.0.1" {
+				if parsedURL.Port() != "" {
+					parsedURL.Host = "host.docker.internal" + ":" + parsedURL.Port()
+				} else {
+					parsedURL.Host = "host.docker.internal"
+				}
+				sourceURL = parsedURL.String()
+			}
+		}
 
 		cfg, db, repo, lock, err := getRepoContext()
 		if err != nil {

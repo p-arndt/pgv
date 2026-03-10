@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// FSCTL_DUPLICATE_EXTENTS_TO_FILE is the control code for duplicating extents from one file to another on Windows.
+// This control code is used with the DeviceIoControl function to perform file cloning operations.
 const FSCTL_DUPLICATE_EXTENTS_TO_FILE = 0x98344
 
 type duplicateExtentsData struct {
