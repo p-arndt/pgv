@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"pgv/internal/config"
 	"pgv/internal/metadata"
 	"pgv/internal/util"
+
+	"github.com/google/uuid"
 )
 
 func TestBranchService_CreateCheckoutDelete(t *testing.T) {
@@ -86,6 +87,9 @@ func TestBranchService_CreateCheckoutDelete(t *testing.T) {
 	if branch.IsHead {
 		t.Errorf("Expected newly created branch to NOT be head")
 	}
+	if branch.Port != 5540 {
+		t.Errorf("Expected new branch default port 5540, got %d", branch.Port)
+	}
 
 	// 4. Test Checkout
 	if err := branchSvc.Checkout(ctx, repo.ID, newBranchName); err != nil {
@@ -131,6 +135,79 @@ func TestBranchService_CreateCheckoutDelete(t *testing.T) {
 	err = db.Get(&deletedBranch, "SELECT * FROM branches WHERE id = ?", branch.ID)
 	if err == nil {
 		t.Fatalf("Expected branch to be deleted")
+	}
+}
+
+func TestBranchService_CreateBranch_UsesConfiguredBasePort(t *testing.T) {
+	tempDir := t.TempDir()
+
+	repoSvc := NewRepoService(tempDir)
+	if err := repoSvc.Init("test-repo", ""); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	cfgPath := filepath.Join(tempDir, ".pgv", "config.json")
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+	cfg.BasePort = 6600
+	if err := config.SaveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("Failed to save config: %v", err)
+	}
+
+	dbPath := filepath.Join(tempDir, ".pgv", "meta", "state.db")
+	db, err := metadata.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open DB: %v", err)
+	}
+	defer db.Close()
+
+	branchSvc, err := NewBranchService(db, "copydir")
+	if err != nil {
+		t.Fatalf("Failed to create BranchService: %v", err)
+	}
+
+	var repo metadata.Repo
+	if err := db.Get(&repo, "SELECT * FROM repos LIMIT 1"); err != nil {
+		t.Fatalf("Failed to get repo: %v", err)
+	}
+
+	snapID := uuid.New().String()
+	now := time.Now().UTC()
+	snap := metadata.Snapshot{
+		ID:               snapID,
+		RepoID:           repo.ID,
+		ParentSnapshotID: nil,
+		SourceBranchID:   nil,
+		Label:            "test-snap-custom-port",
+		Kind:             "manual",
+		DataPath:         filepath.Join(tempDir, "dummy-snap-path-custom-port"),
+		DriverType:       "copydir",
+		RestorePointName: "rp",
+		LSN:              "0/0",
+		SizeBytes:        0,
+		CreatedAt:        now,
+	}
+
+	_, err = db.NamedExec(`INSERT INTO snapshots (id, repo_id, label, kind, data_path, driver_type, restore_point_name, lsn, size_bytes, created_at)
+		VALUES (:id, :repo_id, :label, :kind, :data_path, :driver_type, :restore_point_name, :lsn, :size_bytes, :created_at)`, snap)
+	if err != nil {
+		t.Fatalf("Failed to insert dummy snapshot: %v", err)
+	}
+
+	branchID, err := branchSvc.CreateBranch(context.Background(), repo.ID, snapID, "feature-custom-port")
+	if err != nil {
+		t.Fatalf("CreateBranch failed: %v", err)
+	}
+
+	var branch metadata.Branch
+	if err := db.Get(&branch, "SELECT * FROM branches WHERE id = ?", branchID); err != nil {
+		t.Fatalf("Failed to get created branch: %v", err)
+	}
+
+	if branch.Port != 6600 {
+		t.Fatalf("Expected branch port 6600, got %d", branch.Port)
 	}
 }
 

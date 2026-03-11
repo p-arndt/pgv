@@ -90,9 +90,13 @@ pgv checkpoint "before dropping users table"
 **Branch off to try a new feature isolated from main:**
 ```bash
 pgv branch "before dropping users table" feature-branch
-pgv start feature-branch
+pgv checkout feature-branch
+# Optional: keep both running for side-by-side testing
+pgv start main --parallel
 ```
-*Your feature branch will start on a new port (e.g., 5541).*
+
+> [!NOTE]
+> PGV stops the currently running branch (if any) and starts `feature-branch` on port 5540 by default. Use `--parallel` when you want multiple branches running on different ports.
 
 **Oops, I broke my database! Let's restore it:**
 ```bash

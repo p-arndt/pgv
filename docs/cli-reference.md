@@ -22,12 +22,16 @@ Displays the active branch, its status (running/stopped), current port, and the 
 
 ### `pgv start <branch-name>`
 Starts an isolated Postgres Docker container for the specified branch.
+- Default mode: stops other running branches and starts on the base port (default `5540`).
+- `--parallel`: keeps other running branches alive and starts this branch on the next available port (`5540`, `5541`, ...).
 
 ### `pgv stop <branch-name>`
 Stops the Postgres Docker container for the specified branch.
 
 ### `pgv checkout <branch-name>` (or `pgv switch <branch-name>`, `pgv co <branch-name>`)
 Switches your active working branch (HEAD).
+- Default mode: stops the current running branch (if needed) and starts the checked-out branch on the base port.
+- `--parallel`: switches HEAD and starts the checked-out branch on a different available port without stopping other running branches.
 
 ### `pgv branch <new-branch-name> [source]`
 Creates a new writable branch isolated from the rest of your database. 

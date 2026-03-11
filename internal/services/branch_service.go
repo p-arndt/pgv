@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
 	"pgv/internal/config"
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
 	"pgv/internal/snapshot/cowfs"
+
+	"github.com/google/uuid"
 )
 
 type BranchService struct {
@@ -60,13 +61,11 @@ func (s *BranchService) CreateBranch(ctx context.Context, repoID, sourceSnapshot
 		return "", fmt.Errorf("driver failed to clone branch: %w", err)
 	}
 
-	// 3. Allocate port (naive MVP approach: max port + 1)
-	var maxPort int
-	s.db.Get(&maxPort, "SELECT MAX(port) FROM branches WHERE repo_id = ?", repoID)
-	if maxPort == 0 {
-		maxPort = 5540
-	} else {
-		maxPort++
+	// 3. Use the repository base port for all branches by default.
+	allocatedPort := 5540
+	cfgPath := filepath.Join(repo.RootPath, ".pgv", "config.json")
+	if cfg, err := config.LoadConfig(cfgPath); err == nil && cfg.BasePort > 0 {
+		allocatedPort = cfg.BasePort
 	}
 
 	now := time.Now().UTC()
@@ -78,7 +77,7 @@ func (s *BranchService) CreateBranch(ctx context.Context, repoID, sourceSnapshot
 		HeadSnapshotID: snap.ID,
 		DataPath:       branchDataPath,
 		Status:         "stopped",
-		Port:           maxPort,
+		Port:           allocatedPort,
 		IsHead:         false,
 		CreatedAt:      now,
 		UpdatedAt:      now,

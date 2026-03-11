@@ -90,11 +90,11 @@ pgv branch "before dropping users table" feature-x
 # Switch to the new branch
 pgv checkout feature-x
 
-# Start the feature branch
-pgv start feature-x
+# Optional: run feature-x in parallel with main
+pgv start feature-x --parallel
 ```
 
 > [!NOTE]
-> Your feature branch will be assigned a new port automatically, allowing you to run `main` and `feature-x` simultaneously!
+> By default PGV uses one active running branch on port `5540`. Use `--parallel` to run multiple branches at once on different ports.
 
 For more detailed command usage, see the [CLI Reference](cli-reference.md).

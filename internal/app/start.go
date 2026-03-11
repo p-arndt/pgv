@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
 	"pgv/internal/services"
+
+	"github.com/spf13/cobra"
 )
+
+var startParallel bool
 
 var startCmd = &cobra.Command{
 	Use:   "start <branch-name>",
@@ -40,15 +43,19 @@ var startCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Starting branch '%s'...\n", branchName)
-		if err := runtimeSvc.StartBranch(context.Background(), branch.ID, cfg); err != nil {
+		if err := runtimeSvc.StartBranchWithOptions(context.Background(), branch.ID, cfg, services.StartBranchOptions{Parallel: startParallel}); err != nil {
 			return err
 		}
 
+		if err := db.Get(&branch, "SELECT * FROM branches WHERE id = ?", branch.ID); err != nil {
+			return fmt.Errorf("branch started but failed to load updated port: %w", err)
+		}
 		fmt.Printf("Branch '%s' started on port %d.\n", branchName, branch.Port)
 		return nil
 	},
 }
 
 func init() {
+	startCmd.Flags().BoolVar(&startParallel, "parallel", false, "Start branch in parallel without stopping currently running branches")
 	rootCmd.AddCommand(startCmd)
 }
