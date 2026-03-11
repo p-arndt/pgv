@@ -9,13 +9,13 @@ Initializes a new PGV repository in the current directory.
 - `[repo-name]`: Optional name for the repository. Defaults to the current folder name.
 - `--from-dir`: Optional path to an existing `PGDATA` directory to instantly import as your `main` branch.
 
-### `pgv list` (or `pgv ls`)
+### `pgv list` (or `pgv ls`, `pgv log`)
 Lists all branches, their current status (stopped/running), ports, and all available snapshots.
 
 ### `pgv url [branch-name]`
 Outputs the `postgres://` connection string for the specified branch. If no branch is specified, it outputs the URL for the active branch.
 
-### `pgv status`
+### `pgv status` (or `pgv st`)
 Displays the active branch, its status (running/stopped), current port, and the most recent snapshot applied.
 
 ## Branch Management
@@ -26,7 +26,7 @@ Starts an isolated Postgres Docker container for the specified branch.
 ### `pgv stop <branch-name>`
 Stops the Postgres Docker container for the specified branch.
 
-### `pgv checkout <branch-name>`
+### `pgv checkout <branch-name>` (or `pgv switch <branch-name>`, `pgv co <branch-name>`)
 Switches your active working branch (HEAD).
 
 ### `pgv branch <new-branch-name> [source]`
@@ -34,20 +34,26 @@ Creates a new writable branch isolated from the rest of your database.
 - If `[source]` is omitted, it branches directly from the active branch.
 - `[source]` can be a branch name or an immutable snapshot ID. If a branch is specified as the source, PGV automatically creates a checkpoint first to branch from.
 
-### `pgv delete branch <branch-name> [--force]`
-Permanently deletes a branch and its physical data. 
-- `--force` (or `-f`): Forces deletion even if the branch is currently running or is the active HEAD.
+### `pgv branch -d <branch-name> [--force]`
+Deletes a branch via the Git-style `branch` flow.
+- `-d`: Safe delete (fails for active/running branches).
+- `--force`: Force delete (explicit, for active/running branches).
+
+### `pgv snapshot -d <snapshot-id-or-label> [--force]` (or `pgv snap -d <snapshot-id-or-label> [--force]`)
+Deletes a snapshot.
+- `-d`: Safe delete (fails when the snapshot has child snapshots or tags, or if it is referenced by any branch).
+- `--force`: Deletes even when tagged or when child snapshots exist (children are re-parented).
 
 ## State Management
 
-### `pgv checkpoint <message>`
+### `pgv checkpoint <message>` (or `pgv commit <message>`)
 Takes an immutable physical snapshot of the active branch. 
 
 > [!NOTE]
 > If the branch is running, PGV will automatically stop it, take the physical snapshot, and restart it to prevent data corruption.
 
 
-### `pgv restore <snapshot-id> [--branch <branch-name>]`
+### `pgv restore <snapshot-id> [--branch <branch-name>]` (or `pgv reset <snapshot-id> [--branch <branch-name>]`)
 Replaces the physical state of the specified branch with the contents of a snapshot.
 - `--branch`: Optional. If not provided, restores the currently active branch.
 

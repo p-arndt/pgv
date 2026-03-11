@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
 	"pgv/internal/services"
+
+	"github.com/spf13/cobra"
 )
 
 var restoreBranch string
 
 var restoreCmd = &cobra.Command{
-	Use:   "restore <snapshot-id>",
-	Short: "Replace branch writable state with chosen snapshot state",
-	Args:  cobra.ExactArgs(1),
+	Use:     "restore <snapshot-id>",
+	Aliases: []string{"reset"},
+	Short:   "Replace branch writable state with chosen snapshot state",
+	Args:    cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return getSnapshotsForCompletion()

@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/services"
+
+	"github.com/spf13/cobra"
 )
 
 var checkpointCmd = &cobra.Command{
-	Use:   "checkpoint <message>",
-	Short: "Create a new snapshot from the active branch",
-	Args:  cobra.ExactArgs(1),
+	Use:     "checkpoint <message>",
+	Aliases: []string{"commit"},
+	Short:   "Create a new snapshot from the active branch",
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		label := args[0]
 		cfg, db, repo, lock, err := getRepoContext()

@@ -3,14 +3,16 @@ package app
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
+
+	"github.com/spf13/cobra"
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Display the status of the active branch and repository",
-	Args:  cobra.NoArgs,
+	Use:     "status",
+	Aliases: []string{"st"},
+	Short:   "Display the status of the active branch and repository",
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, db, repo, lock, err := getRepoContext()
 		if err != nil {

@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"pgv/internal/config"
 	"pgv/internal/metadata"
 	"pgv/internal/snapshot"
 	"pgv/internal/snapshot/copydir"
 	"pgv/internal/snapshot/cowfs"
+
+	"github.com/google/uuid"
 )
 
 type SnapshotService struct {
@@ -121,4 +122,74 @@ func (s *SnapshotService) CreateCheckpoint(ctx context.Context, cfg *config.Conf
 	}
 
 	return snapshotID, nil
+}
+
+func (s *SnapshotService) DeleteSnapshot(ctx context.Context, repoID, snapshotRef string, force bool) error {
+	var snap metadata.Snapshot
+	err := s.db.Get(&snap, "SELECT * FROM snapshots WHERE repo_id = ? AND id = ?", repoID, snapshotRef)
+	if err != nil {
+		// Allow deleting by label as a convenience; pick the latest when duplicated.
+		err = s.db.Get(&snap, "SELECT * FROM snapshots WHERE repo_id = ? AND label = ? ORDER BY created_at DESC LIMIT 1", repoID, snapshotRef)
+		if err != nil {
+			return fmt.Errorf("snapshot '%s' not found", snapshotRef)
+		}
+	}
+
+	var branchRefs int
+	if err := s.db.Get(&branchRefs, "SELECT count(*) FROM branches WHERE repo_id = ? AND (base_snapshot_id = ? OR head_snapshot_id = ?)", repoID, snap.ID, snap.ID); err != nil {
+		return err
+	}
+	if branchRefs > 0 {
+		return fmt.Errorf("snapshot '%s' is referenced by one or more branches and cannot be deleted", snap.ID)
+	}
+
+	var tagRefs int
+	if err := s.db.Get(&tagRefs, "SELECT count(*) FROM tags WHERE repo_id = ? AND snapshot_id = ?", repoID, snap.ID); err != nil {
+		return err
+	}
+
+	var childRefs int
+	if err := s.db.Get(&childRefs, "SELECT count(*) FROM snapshots WHERE repo_id = ? AND parent_snapshot_id = ?", repoID, snap.ID); err != nil {
+		return err
+	}
+
+	if !force {
+		if tagRefs > 0 {
+			return fmt.Errorf("snapshot '%s' has tags; use --force to delete", snap.ID)
+		}
+		if childRefs > 0 {
+			return fmt.Errorf("snapshot '%s' has child snapshots; use --force to delete", snap.ID)
+		}
+	}
+
+	if err := s.driver.DeleteSnapshot(ctx, snapshot.DeleteSnapshotRequest{TargetPath: snap.DataPath}); err != nil {
+		return fmt.Errorf("failed to delete snapshot data: %w", err)
+	}
+
+	tx := s.db.MustBegin()
+
+	if force {
+		if childRefs > 0 {
+			_, err = tx.Exec("UPDATE snapshots SET parent_snapshot_id = ? WHERE repo_id = ? AND parent_snapshot_id = ?", snap.ParentSnapshotID, repoID, snap.ID)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+		if tagRefs > 0 {
+			_, err = tx.Exec("DELETE FROM tags WHERE repo_id = ? AND snapshot_id = ?", repoID, snap.ID)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+	}
+
+	_, err = tx.Exec("DELETE FROM snapshots WHERE repo_id = ? AND id = ?", repoID, snap.ID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }

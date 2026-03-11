@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
 	"pgv/internal/services"
+
+	"github.com/google/uuid"
+	"github.com/spf13/cobra"
 )
 
 func setupTestRepo(t *testing.T) (string, *metadata.DB, *metadata.Repo) {
@@ -195,5 +196,34 @@ func TestBranchCmd_FromSnapshotLabel(t *testing.T) {
 
 	if branch.BaseSnapshotID != snapID {
 		t.Errorf("Expected branch to be created from %s, got %s", snapID, branch.BaseSnapshotID)
+	}
+}
+
+func TestBranchCmd_DeleteMode(t *testing.T) {
+	tempDir, db, repo := setupTestRepo(t)
+	defer db.Close()
+
+	origWd, _ := os.Getwd()
+	os.Chdir(tempDir)
+	defer os.Chdir(origWd)
+
+	// Create a non-active branch first.
+	out, err := executeCommand(rootCmd, "branch", "feature-delete")
+	if err != nil {
+		t.Fatalf("branch create command failed: %v\nOutput: %s", err, out)
+	}
+
+	// Delete it through git-style branch delete mode.
+	out, err = executeCommand(rootCmd, "branch", "-d", "feature-delete")
+	if err != nil {
+		t.Fatalf("branch delete command failed: %v\nOutput: %s", err, out)
+	}
+
+	var count int
+	if err := db.Get(&count, "SELECT count(*) FROM branches WHERE repo_id = ? AND name = ?", repo.ID, "feature-delete"); err != nil {
+		t.Fatalf("failed to verify branch deletion: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected feature-delete to be deleted")
 	}
 }

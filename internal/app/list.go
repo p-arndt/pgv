@@ -5,13 +5,14 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
+
+	"github.com/spf13/cobra"
 )
 
 var listCmd = &cobra.Command{
 	Use:     "list",
-	Aliases: []string{"ls"},
+	Aliases: []string{"ls", "log"},
 	Short:   "List branches and snapshots",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, db, repo, lock, err := getRepoContext()

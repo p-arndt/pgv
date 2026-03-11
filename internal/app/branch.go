@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"pgv/internal/metadata"
 	"pgv/internal/services"
+
+	"github.com/spf13/cobra"
 )
+
+var branchDelete bool
+var branchForceDelete bool
 
 var branchCmd = &cobra.Command{
 	Use:   "branch <new-branch-name> [source]",
@@ -15,9 +19,29 @@ var branchCmd = &cobra.Command{
 	Long: `Create a new writable branch. 
 If [source] is omitted, it branches from the active branch.
 [source] can be a branch name or a snapshot ID. 
-If a branch is specified, an automatic checkpoint is created first.`,
-	Args: cobra.RangeArgs(1, 2),
+If a branch is specified, an automatic checkpoint is created first.
+
+Use -d to delete a branch. Use --force together with -d to force delete.`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		deleteMode, _ := cmd.Flags().GetBool("delete")
+		forceDeleteMode, _ := cmd.Flags().GetBool("force")
+		if forceDeleteMode && !deleteMode {
+			return fmt.Errorf("--force requires --delete (-d)")
+		}
+		if deleteMode {
+			return cobra.ExactArgs(1)(cmd, args)
+		}
+		return cobra.RangeArgs(1, 2)(cmd, args)
+	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		deleteMode, _ := cmd.Flags().GetBool("delete")
+		if deleteMode {
+			if len(args) == 0 {
+				return getBranchesForCompletion()
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
 		if len(args) == 1 {
 			// Complete source: branches and snapshots
 			comps, _ := getBranchesForCompletion()
@@ -36,6 +60,21 @@ If a branch is specified, an automatic checkpoint is created first.`,
 		}
 		defer lock.Unlock()
 		defer db.Close()
+
+		if branchDelete {
+			branchSvc, err := services.NewBranchService(db, repo.SnapshotDriver)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Deleting branch '%s'...\n", branchName)
+			if err := branchSvc.DeleteBranch(context.Background(), repo.ID, branchName, branchForceDelete); err != nil {
+				return err
+			}
+
+			fmt.Printf("Branch deleted successfully: %s\n", branchName)
+			return nil
+		}
 
 		source := ""
 		if len(args) == 2 {
@@ -104,5 +143,7 @@ If a branch is specified, an automatic checkpoint is created first.`,
 }
 
 func init() {
+	branchCmd.Flags().BoolVarP(&branchDelete, "delete", "d", false, "Delete a branch")
+	branchCmd.Flags().BoolVar(&branchForceDelete, "force", false, "Force delete a branch (use with -d)")
 	rootCmd.AddCommand(branchCmd)
 }
