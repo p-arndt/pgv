@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,7 +16,14 @@ import (
 
 type RuntimeService struct {
 	db      *metadata.DB
-	manager *docker.Manager
+	manager runtimeManager
+}
+
+type runtimeManager interface {
+	Start(ctx context.Context, req docker.StartRequest) (string, error)
+	Stop(ctx context.Context, containerID string) error
+	Remove(ctx context.Context, containerID string) error
+	Status(ctx context.Context, containerID string) (string, error)
 }
 
 type StartBranchOptions struct {
@@ -40,7 +49,18 @@ func (s *RuntimeService) StartBranchWithOptions(ctx context.Context, branchID st
 	}
 
 	if branch.Status == "running" {
-		return fmt.Errorf("branch %s is already running", branch.Name)
+		isRunning, err := s.isBranchRuntimeActive(ctx, branch)
+		if err != nil {
+			return fmt.Errorf("failed to verify runtime state for branch %s: %w", branch.Name, err)
+		}
+		if isRunning {
+			return fmt.Errorf("branch %s is already running", branch.Name)
+		}
+
+		if err := s.markBranchStopped(branch.ID); err != nil {
+			return fmt.Errorf("failed to reconcile stale running state for branch %s: %w", branch.Name, err)
+		}
+		branch.Status = "stopped"
 	}
 
 	hostPort := cfg.BasePort
@@ -157,8 +177,8 @@ func (s *RuntimeService) StopBranch(ctx context.Context, branchID string) error 
 	}
 
 	var instance metadata.Instance
-	if err := s.db.Get(&instance, "SELECT * FROM instances WHERE branch_id = ? AND status = 'running' LIMIT 1", branchID); err != nil {
-		// inconsistency? force stop
+	if err := s.db.Get(&instance, "SELECT * FROM instances WHERE branch_id = ? AND status = 'running' LIMIT 1", branchID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to query running instance for branch %s: %w", branch.Name, err)
 	}
 
 	containerName := instance.ContainerName
@@ -169,24 +189,67 @@ func (s *RuntimeService) StopBranch(ctx context.Context, branchID string) error 
 		containerName = fmt.Sprintf("pgv-%s-%s", repo.Name, branch.Name)
 	}
 
-	if err := s.manager.Stop(ctx, containerName); err != nil {
-		// Log error but proceed to remove
+	if containerName != "" {
+		if err := s.manager.Stop(ctx, containerName); err != nil && !docker.IsNotFoundError(err) {
+			return fmt.Errorf("failed to stop container %s: %w", containerName, err)
+		}
+
+		if err := s.manager.Remove(ctx, containerName); err != nil && !docker.IsNotFoundError(err) {
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
 	}
 
-	if err := s.manager.Remove(ctx, containerName); err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
+	return s.markBranchStopped(branch.ID)
+}
+
+func (s *RuntimeService) isBranchRuntimeActive(ctx context.Context, branch metadata.Branch) (bool, error) {
+	var instance metadata.Instance
+	if err := s.db.Get(&instance, "SELECT * FROM instances WHERE branch_id = ? AND status = 'running' ORDER BY started_at DESC LIMIT 1", branch.ID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
 	}
 
+	containerName := instance.ContainerName
+	if containerName == "" {
+		var repo metadata.Repo
+		if err := s.db.Get(&repo, "SELECT * FROM repos WHERE id = ?", branch.RepoID); err == nil {
+			containerName = fmt.Sprintf("pgv-%s-%s", repo.Name, branch.Name)
+		}
+	}
+
+	if containerName == "" {
+		return false, nil
+	}
+
+	status, err := s.manager.Status(ctx, containerName)
+	if err != nil {
+		if docker.IsNotFoundError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	switch status {
+	case "running", "restarting", "created":
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (s *RuntimeService) markBranchStopped(branchID string) error {
 	now := time.Now().UTC()
 	tx := s.db.MustBegin()
 
-	_, err := tx.Exec(`UPDATE instances SET status = ?, stopped_at = ? WHERE branch_id = ? AND status = 'running'`, "stopped", now, branch.ID)
+	_, err := tx.Exec(`UPDATE instances SET status = ?, stopped_at = ? WHERE branch_id = ? AND status = 'running'`, "stopped", now, branchID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE branches SET status = ?, updated_at = ? WHERE id = ?`, "stopped", now, branch.ID)
+	_, err = tx.Exec(`UPDATE branches SET status = ?, updated_at = ? WHERE id = ?`, "stopped", now, branchID)
 	if err != nil {
 		tx.Rollback()
 		return err

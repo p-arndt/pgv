@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -111,10 +112,14 @@ func (m *Manager) Remove(ctx context.Context, containerID string) error {
 func (m *Manager) Status(ctx context.Context, containerID string) (string, error) {
 	inspect, err := m.cli.ContainerInspect(ctx, containerID)
 	if err != nil {
-		if client.IsErrNotFound(err) {
+		if IsNotFoundError(err) {
 			return "not-found", nil
 		}
 		return "unknown", err
 	}
 	return inspect.State.Status, nil
+}
+
+func IsNotFoundError(err error) bool {
+	return client.IsErrNotFound(err) || errdefs.IsNotFound(err)
 }
